@@ -1,0 +1,133 @@
+
+Komprese TGA obrázku
+
+Napište program, který bude umět komprimovat a dekomprimovat TGA obrázky metodou JBK (jé-bé-ké), neboli Jednoduchou Blokovou Kompresí.
+
+Komprese bude fungovat tak, že rozdělí obrázek na bloky se zadaným rozměrem a v každém bloku bude hledat posloupnosti podobných pixelů. Ty poté nahradí dvojicí obsahující první pixel v posloupnosti a počet pixelů v posloupnosti. Jedná se o formu tzv. RLE (run-length encoding) komprese.
+Vstup programu
+
+Program bude povinně akceptovat argumenty příkazové řádky. První argument bude určovat, zda se má provést komprese či dekomprese. V závislosti na prvním parametru dále program bude načítat další argumenty z příkazového řádku.
+
+    Komprese
+
+    $ ./jbk compress
+
+    Za tímto argumentem budou následovat další argumenty:
+        --input <cesta k souboru> - cesta ke vstupnímu TGA obrázku.
+        --output <cesta k souboru> - cesta k výstupnímu zkomprimovanému JBK souboru.
+        --block-size <číslo> - velikost bloku.
+        --max-diff <číslo> - maximální rozdíl dvou pixelů.
+
+    Dekomprese
+
+    $ ./jbk decompress
+
+    Za tímto argumentem budou následovat další argumenty:
+        --input <cesta k souboru> - cesta ke vstupnímu zkomprimovanému JBK souboru.
+        --output <cesta k souboru> - cesta k výstupnímu (dekomprimovanému) TGA souboru.
+
+Argumenty programu (kromě prvního compress/decompress) mohou být zadány v libovolném pořadí! Pokud některý z nich bude chybět nebo se bude vyskytovat vícekrát, tak vypište chybovou hlášku a ukončete program.
+
+Poznámka: pokud budete zápasit s načítáním vstupů příkazového řádku, tak si klidně nejprve vstupy programu zadejte "natvrdo" ve funkci main, a k načítání vstupů z příkazové řádky se vraťte později, ať se na tom zbytečně nezaseknete.
+
+Nemusíte podporovat všechny dostupné formáty TGA souborů. Stačí podporovat RGB 24-bitový formát (tj. 3 byty na každý pixel), bez indexů, color map, TGA komprese či dalších vlastností. Tedy to, co byste měli znát ze cvičení. Při vizuálním testování programu si dejte pozor na to, kde má daný obrázek počátek souřadnic (jestli v levém horním, nebo levém dolním rohu).
+
+Při kompresi si po načtení TGA obrázku ověřte, že šířka i výška vstupního TGA obrázku je násobkem zadané velikosti bloku. Pokud by tomu tak nebylo, vypište chybovou hlášku a ukončete program (nemusíte řešit situaci, kdy bloky nebudou do obrázku hezky pasovat, viz níže).
+Komprese
+
+Komprese obrázku bude probíhat po blocích, čtvercových výsecích obrázku s rozměrem zadaným na vstupu. Představte si, že je obrázek rozdělený na bloky s rozměry (velikost bloku, velikost bloku) tak, že první blok bude začínat na pozici (0, 0). Další bloky budou přibývat postupně doprava a dolů ("řádek po řádku"). Například, pokud bychom měli obrázek s rozměry 8x8, tak by rozdělení na bloky vypadalo následovně (označení Bn značí pixel, který náleží bloku n):
+
+    Pro velikost bloku 2:
+
+    Pro velikost bloku 4:
+
+Komprese obrázku bude vždy probíhat po blocích. Tj. nejprve zkomprimujete první blok, poté druhý blok, atd., jako by to byly zcela nezávislé obrázky. JBK komprese komprimuje pixely bloku do tzv. sekvencí. Sekvence obsahuje RGB hodnotu pixelu, a číslo, které udává, kolikrát se stejný (případně podobný) pixel vyskytoval za sebou v rámci bloku. Pokud by se například blok 4x4 skládal pouze z červených pixelů, tak by jej stačilo zakomprimovat jedinou sekvencí s hodnotou pixel=(255,0,0), delka=16.
+
+Při kompresi bloku jeho pixely procházejte v běžném "row-major" pořadí, tj. začněte v levém horním rohu bloku, a dále pokračujte doprava a dolů ("řádek po řádku"). Takže např. pro blok o rozměrech 4x4 byste měli pixely projít v tomto pořadí:
+
+Na začátku bloku si vytvořte sekvenci sestávající se z prvního pixelu bloku. Při generování sekvencí poté musíte zjišťovat, jestli je současný pixel podobný pixelu v současné sekvenci. Pokud ano, tak zvýšíte délku současné sekvence. Pokud ne, tak současnou sekvenci zaznamenáte (ideálně nejprve do pole v paměti, ne rovnou do výstupního souboru) a vytvoříte novou sekvenci se současným pixelem.
+
+Sekvence budete vytvářet vždycky pouze v rámci jednoho bloku, tj. i kdyby dva pixely mezi různými bloky byly v daném pořadí průchodu podobné, tak musíte na konci prvního bloku sekvenci ukončit a na začátku druhého bloku opět začít novou sekvenci.
+
+Pro výpočet podobnosti dvou pixelů si nadefinujeme rozdíl dvou pixelů: součet absolutních hodnot rozdílů barevných složek pixelů. Například, pokud bychom měli pixely (125,200,5) a (124,201,5), tak rozdíl mezi nimi je 2: abs(125 - 124) + abs(200 - 201) + abs(5 - 5). Dva pixely jsou si podobné, pokud je jejich rozdíl menší nebo roven zadanému maximálnímu rozdílu.
+
+Zde je ukázka několika bloků a sekvencí, které by měly být vytvořeny při jejich kompresi. V každém čtverečku je na prvním řádku RGB hodnota pixelu. Na druhém řádku je index sekvence, do které byl pixel zakomprimován, a za lomítkem rozdíl daného pixelu od prvního pixelu jeho sekvence (případně p, pokud je pixel prvním pixelem své sekvence).
+
+    Maximální rozdíl 0:
+
+        Sekvence pixel=(255,0,0), delka=1
+        Sekvence pixel=(0,255,0), delka=3
+        Sekvence pixel=(255,0,0), delka=2
+        Sekvence pixel=(0,1,255), delka=1
+        Sekvence pixel=(0,0,255), delka=2
+
+    Maximální rozdíl 20:
+
+        Sekvence pixel=(255,0,0), delka=1
+        Sekvence pixel=(255,21,0), delka=3
+        Sekvence pixel=(255,51,2), delka=1
+        Sekvence pixel=(0,255,0), delka=2
+        Sekvence pixel=(0,0,255), delka=2
+
+Jakmile zakomprimujete všechny bloky obrázku, tak výsledná data uložte v binární podobě na disk. Ve výsledném souboru by měly být (minimálně) rozměry původního obrázku, velikost bloku a samozřejmě také zakomprimované sekvence, aby šel původní obrázek posléze zrekonstruovat dekompresí. Formát uložení dat je na vás, myslete však na to, že píšete komprimátor, takže byste měli s byty šetřit :) Data musí být uložena v souboru efektivně v binární podobě, tj. nevypisujte do souboru text v ASCII či jiném textovém formátu.
+
+Program po provedení komprese vypíše jednoduchou statistiku, tj. vypíše počet bytů všech pixelů původního obrázku, počet zakomprimovaných bytů výstupního souboru, a procentuální podíl mezi těmito hodnotami. Např. pokud zabíraly pixely TGA obrázku před kompresí 1000 bytů, a po kompresi to bude pouze 100 bytů, tak bude poměr 10 %.
+
+Poznámky:
+
+    Pokud bude maximální rozdíl roven nule, tak se bude jednat o bezeztrátovou kompresi (tj. výsledek po dekompresi by měl být stejný, jako originální obrázek). Pokud bude maximální rozdíl nenulový, tak se pravděpodobně obrázek lépe zkomprimuje, ale po dekompresi už nedostaneme zpět originál. Při použití bezeztrátové komprese se může u netriviálních obrázků jednoduše stát, že bude výstupní "zkomprimovaný" soubor větší, než ten vstupní!
+    Výše používáme konvenci, že začátek obrázku je v levém horním rohu. U TGA tomu tak vždy být nemusí (může být v levém dolním rohu). Pro kompresi by to ale nemělo víceméně nic měnit. Vždycky bloky vytvářejte tak, aby první blok začínal na pozici (0, 0).
+    Zamyslete se nad tím, kolik bytů by měla zabírat každá zakomprimovaná sekvence. Ideálně byste se měli dostat na 4 byty. Myslete v kódu i na to, aby vám počítadlo délky sekvence nepřeteklo svůj datový typ (zkuste např. nastavit velikost bloku na 32, jestli vám program bude správně komprimovat a dekomprimovat).
+
+Dekomprese
+
+Při dekompresi provedete inverzi předchozí komprese. Načtete z disku JBK soubor a přečtete si z něj, jaké měl původní obrázek rozměry a velikost bloku. Poté si vytvoříte prázdný TGA obrázek s odpovídajícími rozměry.
+
+Výstupní obrázek projdete po blocích úplně stejně jako při kompresi, a budete postupně dekomprimovat zakomprimované sekvence z JBK souboru. Stejně jako u komprese bude platit, že sekvence jsou vždy platné jen v rámci daného bloku, nemělo by se vám tak stát, že dokončíte procházení bloku a budete např. "uprostřed" nějaké sekvence.
+
+Například, pokud byste v JBK souboru měli na začátku tyto tři sekvence:
+
+    pixel=(255,0,0), delka=5
+    pixel=(0,255,0), delka=8
+    pixel=(0,0,255), delka=3
+
+Tak první blok obrázku by po dekompresi vypadal takto:
+
+Příklady vstupu a výstupu
+
+Pro otestování si můžete stáhnout nějaký TGA obrázek z internetu, vytvořit si nějaký ručně, nebo použít vzorové obrázky (carmack, rectangles).
+
+Komprese s velikostí bloku 4 a maximálním rozdílem 2:
+
+./jbk compress --max-diff 2 --input carmack.tga --output out.jbk --block-size 4
+
+Dekomprese zpět:
+
+./jbk decompress --input out.jbk --output decompressed.tga
+
+Pro ukázku, zde jsou referenční výstupy (po kompresi a následné dekompresi) pro různé hodnoty velikosti bloku a maximálního rozdílu nad obrázkem carmack vygenerované referenční implementací:
+
+    --block-size 4 --max-diff 0 (bezeztrátová komprese, JBK soubor má cca 110 % velikost původního souboru)
+
+    --block-size 4 --max-diff 10 (ztrátová komprese, JBK soubor má cca 57 % velikost původního souboru)
+
+    --block-size 4 --max-diff 50 (ztrátová komprese, JBK soubor má cca 24 % velikost původního souboru)
+
+    --block-size 64 --max-diff 70 (ztrátová komprese, JBK soubor má cca 14.5 % velikost původního souboru)
+
+Pokud by vás více zajímala komprese obrázků, tak se můžete např. zde podívat, jak funguje známý formát JPG. Jeho princip je vzdáleně podobný "formátu" JBK, jen trošku složitější :)
+Poznámky k řešení
+
+    Ošetřte v programu chyby, které můžou nastat, např. špatné vstupní parametry. V případě chyby vypište chybovou hlášku a ukončete program s chybovým kódem 1.
+
+    Projekt rozumně rozdělte do více .c/.h souborů a vytvořte k němu bash skript, Makefile nebo CMakeLists.txt soubor, aby šel projekt přeložit i na jiném počítači (viz automatizace překladu).
+    Vytvořte jednoduchý README soubor, který bude popisovat, jak program funguje a jak ho přeložit.
+    Při vývoji používejte Address sanitizer a/nebo Valgrind! Velmi vám to usnadní detekci paměťových chyb. Odevzdaný program nesmí při použití Address sanitizeru ani Valgrindu vyvolat žádné paměťové chyby.
+
+Konzultace a odevzdávání
+
+    Případné nejasnosti v zadání a Vaše řešení průběžně konzultujte se svým cvičícím nebo s Jakubem Beránkem na Discordu (Kobzol), abyste předešli případným nedorozuměním v interpretaci výsledku.
+    Řešení průběžně nahrávejte do systému Kelvin.
+    Do Kelvina nahrávejte pouze soubory, které jsou potřebné k překladu! Tedy zejména hlavičkové a zdrojové soubory, skripty k přeložení programu, případně nějaké obrázky či zvuky u SDL her. Nenahrávejte do Kelvina binární soubory ani žádné další zbytečné soubory.
+    Na projektu pracujte samostatně. Pokud budete opisovat od spolužáků, stáhnete si hotové řešení z internetu nebo si necháte projekt někým vytvořit a nebudete ho schopni obhájit osobně s cvičícím, tak budete vyloučeni z předmětu.
+
