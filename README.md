@@ -35,7 +35,7 @@ Veľkosť výstupu `.jbk` v bajtoch, nameraná pri kompilácii s `gcc -O2`:
 
 Pri `--max-diff 0` je výstup **väčší** ako originál (asi 108 %). Obrázok má málo opakujúcich sa pixelov a každá sekvencia stojí 4 bajty namiesto 3. Metóda sa oplatí pre obrázky s veľkými rovnakými plochami alebo pri stratovej kompresii.
 
-## Čo som sa naučil / obmedzenia
+## Techniky a obmedzenia
 
 - Binárny formát a práca s hlavičkami (`#pragma pack`, `fread`/`fwrite`).
 - Dynamické pole sekvencií s `realloc`.
